@@ -1,35 +1,10 @@
-import pygame
+import copy
 import time
+
+import pygame
+
+from constants import *
 from tile import Tile
-
-WINDOW_SIZE = (850, 700)  # set the window size
-
-# The size of a tile
-TILE_SIZE = 32
-
-# GRID POSITIONING
-LEFT_BOUND = TILE_SIZE * 7  # Left Bound
-RIGHT_BOUND = LEFT_BOUND + 9 * TILE_SIZE  # Right Bound
-LOWER_BOUND = TILE_SIZE * 16  # Lower Bound
-UPPER_BOUND = TILE_SIZE * 2  # Upper Bound
-
-# Default position of the next tetromino
-DEFAULT_POSITIONS = [
-    [(5, 2), (6, 2), (7, 2), (8, 2)],
-    [(5, 3), (6, 3), (7, 3), (8, 3)],
-    [(5, 4), (6, 4), (7, 4), (8, 4)],
-    [(5, 5), (6, 5), (7, 5), (8, 5)]
-]
-
-tetromino_colors = {
-    'I': (0, 255, 255),
-    'J': (0, 0, 255),
-    'L': (255, 127, 0),
-    'O': (255, 255, 0),
-    'S': (0, 255, 0),
-    'Z': (255, 0, 0),
-    'T': (128, 0, 128)
-}
 
 
 def matrix_to_tiles(binary_matrix, color):
@@ -44,9 +19,20 @@ def matrix_to_tiles(binary_matrix, color):
     return tile_group
 
 
-class Tetromino:
+def get_default_origin(tetromino_type: str) -> list[int, int]:
+    # The square piece cannot rotate.
+    if tetromino_type == 'O':
+        return [0, 0]
+    # The aqua-colored straight piece has a special rotation point in between its middle tiles
+    if tetromino_type == 'I':
+        return [416, 96]
+    # Every other tetromino type has the same default origin because they're 3x3
+    return [384, 96]
 
+
+class Tetromino:
     def __init__(self, tetromino_type: str, binary_matrix: list[list[int]]):
+        self.origin_cords = get_default_origin(tetromino_type)
         # Color and Type
         self.type = tetromino_type
         self.color = tetromino_colors[tetromino_type]
@@ -58,6 +44,12 @@ class Tetromino:
         # Timer spent touching the ground
         self.timer = 0
 
+        # The shadow tetromino showing the player where the piece will drop
+        self.shadow = copy.deepcopy(self)
+        self.shadow.color = (int(0.5 * self.color[0]),
+                             int(0.5 * self.color[1]),
+                             int(0.5 * self.color[2]))
+
     def draw(self, screen) -> None:
         for tile in self.tile_group:
             pygame.draw.rect(screen, self.color, tile.rect)
@@ -67,40 +59,30 @@ class Tetromino:
         for tile in self.tile_group:
             tile.update()
 
-    def rotate(self, placed_tiles) -> None:
-        # Sort the tiles and extract the middle element (offset) for rotation
-        tile_positions = []
+    def rotate(self, placed_tiles=[]) -> None:
+        # Create a list of new rotated positions for each tile
+        rotated_positions = []
         for tile in self.tile_group:
-            tile_positions.append(tuple(tile.position))
-        tile_positions.sort(key=lambda position: position[0])
-        offset_x = tile_positions[int((len(tile_positions) - 1) / 2)][0]
-        # Get the middle x, y offset
-        potential_offset = []
-        for position in tile_positions:
-            if offset_x == position[0]:
-                potential_offset.append(position)
-        potential_offset.sort(key=lambda position: position[1])
-        offset = list(potential_offset[int((len(potential_offset)) / 2)])
-        # Offset (x, y) is set to the origin for rotation of (0, 0)
-        new_positions = []
-        for tile in self.tile_group:
-            origin_position = [tile.position[0] - offset[0], offset[1] - tile.position[1]]
-            origin_x, origin_y = origin_position[0], origin_position[1]
-            # (x, y) -> (-y, x) is a 90-degree clockwise rotation
-            rotated_position = [origin_y, -1 * origin_x]
-            new_positions.append([rotated_position[0] + offset[0], -1 * (rotated_position[1] - offset[1])])
+            # Get the tile's (x, y) coordinates relative to the designated origin
+            origin_pos = [tile.position[0] - self.origin_cords[0], tile.position[1] - self.origin_cords[1]]
+            # Rotate the coordinates by translating (x, y) to (-y, x)
+            rotated_positions.append([-origin_pos[1] + self.origin_cords[0], origin_pos[0] + self.origin_cords[1]])
         can_rotate = True
-        for new_position in new_positions:
+        # Check that the tetromino rotation does not go out of bounds or interfere with other tiles
+        for new_position in rotated_positions:
+            # Check that each tile is within bounds after rotation
             if new_position[0] < LEFT_BOUND or new_position[0] > RIGHT_BOUND or new_position[1] > LOWER_BOUND:
                 can_rotate = False
                 break
+            # Check that each tile in the tetromino won't overlap with an existing tile
             for placed_tile in placed_tiles:
                 if new_position == placed_tile.position:
                     can_rotate = False
                     break
+        # Set the coordinates of each tile to the new rotated coordinates
         if can_rotate:
             for index in range(len(self.tile_group)):
-                self.tile_group[index].position = new_positions[index]
+                self.tile_group[index].position = rotated_positions[index]
                 self.tile_group[index].update()
 
     def place_tetromino(self):
@@ -122,13 +104,16 @@ class Tetromino:
                 return False
         return True
 
-    def move_down(self, placed_tiles=[], override=False) -> None:
+    def move_down(self, placed_tiles=[], check_bound=True) -> None:
         # Move tetromino down if possible
-        if self.can_move_down(placed_tiles) or override:
+        if self.can_move_down(placed_tiles) or not check_bound:
+            self.origin_cords[1] += TILE_SIZE
             for tile in self.tile_group:
-                tile.move_down(placed_tiles, override=True)
+                tile.move_down(placed_tiles, check_bound)
+        else:
+            self.place_tetromino()
 
-    def move_left(self, placed_tiles=[]):
+    def move_left(self, placed_tiles=[], check_bound=True):
         can_move_left = True
         # Check for leftward placed tiles
         for tile in self.tile_group:
@@ -139,14 +124,15 @@ class Tetromino:
                     break
         # Check left bound
         for tile in self.tile_group:
-            if tile.position[0] - TILE_SIZE < LEFT_BOUND:
+            if check_bound and tile.position[0] - TILE_SIZE < LEFT_BOUND:
                 can_move_left = False
-        # move each tile leftward
+        # Move each tile leftward
         if can_move_left:
+            self.origin_cords[0] -= TILE_SIZE
             for tile in self.tile_group:
-                tile.move_left()
+                tile.move_left(check_bound)
 
-    def move_right(self, placed_tiles=[]):
+    def move_right(self, placed_tiles=[], check_bound=True):
         can_move_right = True
         # Check for rightward placed tiles
         for tile in self.tile_group:
@@ -156,9 +142,10 @@ class Tetromino:
                     can_move_right = False
         # Check right bound
         for tile in self.tile_group:
-            if tile.position[0] + TILE_SIZE > RIGHT_BOUND:
+            if check_bound and tile.position[0] + TILE_SIZE > RIGHT_BOUND:
                 can_move_right = False
-        # move each tile rightward
+        # Move each tile rightward
         if can_move_right:
+            self.origin_cords[0] += TILE_SIZE
             for tile in self.tile_group:
-                tile.move_right()
+                tile.move_right(check_bound)

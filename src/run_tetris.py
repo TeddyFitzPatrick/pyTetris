@@ -1,4 +1,6 @@
+import math
 import random
+import time
 
 import pygame
 import sys
@@ -6,6 +8,7 @@ import copy
 
 from pygame.locals import *
 
+from constants import *
 from tetromino import matrix_to_tiles
 from tetromino import Tetromino
 from widgets.button import Button
@@ -13,66 +16,30 @@ from widgets.button import Button
 clock = pygame.time.Clock()  # setup clock
 pygame.init()
 pygame.display.set_caption('Tetris')  # set the window title
-
-WINDOW_SIZE = (850, 600)  # set the window size
 screen = pygame.display.set_mode(WINDOW_SIZE, 0, 32)  # initiate screen
-
 # How fast the blocks fall (milliseconds)
 TICK_SPEED = 1000
-
-# Keep track of the score
-score = 0
-
-# The size of a tile
-TILE_SIZE = 32
-
-# GRID POSITIONING
-LEFT_BOUND = TILE_SIZE * 7  # Left Bound
-RIGHT_BOUND = LEFT_BOUND + 9 * TILE_SIZE  # Right Bound
-LOWER_BOUND = TILE_SIZE * 16  # Lower Bound
-UPPER_BOUND = TILE_SIZE * 2  # Upper Bound
-
-tetrominos = {
-    'I': [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]],
-    'J': [[1, 0, 0], [1, 1, 1], [0, 0, 0]],
-    'L': [[0, 0, 1], [1, 1, 1], [0, 0, 0]],
-    'O': [[1, 1], [1, 1]],
-    'S': [[0, 1, 1], [1, 1, 0], [0, 0, 0]],
-    'Z': [[1, 1, 0], [0, 1, 1], [0, 0, 0]],
-    'T': [[0, 1, 0], [1, 1, 1], [0, 0, 0]]
-}
+score = 0  # Keep track of the score
+high_score = 0
 
 
-def get_next_tetromino(randomize=False):
+def get_next_tetromino():
     # Choose a random tetromino type (e.g. 'L', 'T', 'Z', ...)
     tetromino_type = random.choice(list(tetrominos.keys()))
     # Get the corresponding shape
     binary_matrix = tetrominos[tetromino_type]
-    # Generate random positions for load screen
-    if randomize:
-        next_tetromino = Tetromino(tetromino_type, binary_matrix)
-        x = random.randint(-11, 11) * 32
-        for tile in next_tetromino.tile_group:
-            tile.position[0] += x
-            tile.position[1] -= 4 * 32
-            tile.update()
-        return next_tetromino
     # Create the next random tetromino
     return Tetromino(tetromino_type, binary_matrix)
 
 
-def draw_grid():
+def draw_grid(start_position: list[int, int], horizontal_size: int, vertical_size: int):
     # Generate grid lines
     # 10 horizontal grid boxes
-    for x in range(0, TILE_SIZE * 10, TILE_SIZE):
+    for x in range(0, horizontal_size, TILE_SIZE):
         # 15 vertical grid boxes
-        for y in range(0, TILE_SIZE * 15, TILE_SIZE):
-            grid_box = pygame.Rect(x + LEFT_BOUND, y + UPPER_BOUND, TILE_SIZE, TILE_SIZE)
+        for y in range(0, vertical_size, TILE_SIZE):
+            grid_box = pygame.Rect(start_position[0] + x, start_position[1] + y, TILE_SIZE, TILE_SIZE)
             pygame.draw.rect(screen, (0, 0, 0), grid_box, 1)
-    # Create a border around the grid
-    border = pygame.Rect(LEFT_BOUND - 5, UPPER_BOUND - 5, TILE_SIZE * 10 + 10, TILE_SIZE * 15 + 10)
-    # Draw the border
-    pygame.draw.rect(screen, (0, 0, 0), border, 5)
 
 
 def render_held_tetromino(held_tetromino):
@@ -81,7 +48,7 @@ def render_held_tetromino(held_tetromino):
     held_text = font.render('HELD', True, (5, 5, 5))
     screen.blit(held_text, [TILE_SIZE * 2, TILE_SIZE])
     # Show the held tetromino
-    held_surface = pygame.surface.Surface((5 * TILE_SIZE, 4 * TILE_SIZE), 0, 32)
+    held_surface = pygame.surface.Surface(HELD_DIMENSIONS, 0, 32)
     held_surface.set_colorkey((0, 128, 0))
     held_position = (TILE_SIZE, UPPER_BOUND)
     screen.blit(held_surface, held_position)
@@ -91,13 +58,14 @@ def render_held_tetromino(held_tetromino):
             tile.rect.x -= TILE_SIZE * 9
             tile.rect.y += TILE_SIZE
         held_tetromino.draw(screen)
+    # Draw the grid
+    draw_grid(held_position, HELD_DIMENSIONS[0], HELD_DIMENSIONS[1])
 
 
 def render_upcoming_tetrominos(upcoming_tetrominos):
     # Create a background for the upcoming tetromino surface
-
     upcoming_position = (LEFT_BOUND * 2 + TILE_SIZE * 4, UPPER_BOUND)
-    upcoming_surface = pygame.surface.Surface((5 * TILE_SIZE, 12 * TILE_SIZE), 0, 32)
+    upcoming_surface = pygame.surface.Surface(UPCOMING_DIMENSIONS, 0, 32)
     # Render the upcoming surface
     screen.blit(upcoming_surface, upcoming_position)
     # Place all the upcoming tetrominos on this surface
@@ -109,6 +77,13 @@ def render_upcoming_tetrominos(upcoming_tetrominos):
             tile.rect.y += (2 + elevation) * TILE_SIZE
             pygame.draw.rect(screen, tile.color, tile.rect)
         elevation += 4
+    # Generate grid lines
+    # 10 horizontal grid boxes
+    for x in range(0, TILE_SIZE * 5, TILE_SIZE):
+        # 15 vertical grid boxes
+        for y in range(0, TILE_SIZE * 12, TILE_SIZE):
+            grid_box = pygame.Rect(x + upcoming_position[0], y + upcoming_position[1], TILE_SIZE, TILE_SIZE)
+            pygame.draw.rect(screen, (0, 0, 0), grid_box, 1)
 
 
 def render_stats(tetrominos_placed, time_elapsed):
@@ -130,13 +105,13 @@ def remove_lines(placed_tiles):
     # Make a list of all the rows where placed blocks are.
     rows_to_check = []
     for placed_tile in placed_tiles:
-        if not rows_to_check.__contains__(placed_tile.position[1]):
+        if placed_tile.position[1] not in rows_to_check:
             rows_to_check.append(placed_tile.position[1])
     # Check how many tiles are on a given row
     for check_row in rows_to_check:
         row_coordinates = []
         for placed_tile in placed_tiles:
-            if placed_tile.position[1] == check_row and not row_coordinates.__contains__(placed_tile.position[0]):
+            if placed_tile.position[1] == check_row and placed_tile.position[0] not in row_coordinates:
                 row_coordinates.append(placed_tile.position[0])
         # If a row contains blocks on all 10 columns, add the tiles to the remove queue.
         if len(row_coordinates) >= 10:
@@ -150,10 +125,7 @@ def remove_lines(placed_tiles):
     # Move lines down
     if len(lines_removed) > 0:
         # Increment the score (tetris is bonus points)
-        if len(lines_removed) == 4:
-            score += 800
-        else:
-            score += 100 * len(lines_removed)
+        score += POINTS_PER_TETRIS if len(lines_removed) == 4 else POINTS_PER_LINE * len(lines_removed)
         # Confusion
         lower_bound = (19 - min(lines_removed)) * TILE_SIZE
         tiles_to_shift = []
@@ -177,6 +149,7 @@ def main():
     tetrominos_placed = 0
     # Add upcoming tetrominos to a queue and generate a current
     current_tetromino = get_next_tetromino()
+
     held_tetromino = None
     using_held_piece = False
     upcoming_tetrominos = [get_next_tetromino() for _ in range(3)]
@@ -184,19 +157,17 @@ def main():
     prior_elapsed = 0
     time_elapsed = 1
     place_block_timer = 0
-
     # game loop
     running = True
     while running:
         # RESET SCREEN
-        screen.fill((255, 255, 255))
+        screen.fill(WHITE)
         # Held tetromino box
         render_held_tetromino(copy.deepcopy(held_tetromino))
         # Upcoming tetrominos
         render_upcoming_tetrominos(upcoming_tetrominos)
         # Stats
         render_stats(tetrominos_placed, time_elapsed)
-
         # Place a piece when the timer runs out
         if current_tetromino.can_move_down(placed_tiles):
             # Shutdown the timer when piece can move down
@@ -209,7 +180,6 @@ def main():
         else:
             current_tetromino.place_tetromino()
             place_block_timer = 0
-
         # Generate next piece when current is placed
         if current_tetromino.is_placed:
             tetrominos_placed += 1
@@ -221,35 +191,30 @@ def main():
             current_tetromino = upcoming_tetrominos.pop(0)
             # Put a new tetromino on the back of the queue
             upcoming_tetrominos.append(get_next_tetromino())
-
-        # Adjust the tick speed by the score. SPEED UP
-        TICK_SPEED = 1000 - (score / 5)
-        if TICK_SPEED < 200:
-            TICK_SPEED = 200
-
+        # Adjust the tick speed to the score
+        TICK_SPEED = 1000 - ((825/4000) * score)
+        if TICK_SPEED < 150:
+            TICK_SPEED = 150
         # Game ticks -> Tetromino moves down
         time_elapsed += clock.get_time()
         if time_elapsed > prior_elapsed + TICK_SPEED:
-            # Every game tick, move the tetromino down and update the tick
+            # Every game tick, move the tetromino down and update the prior tick checkpoint
+            # Gravity
             current_tetromino.move_down(placed_tiles)
             prior_elapsed = time_elapsed
         # HANDLE KEY PRESSES
         for event in pygame.event.get():
-            # quit type
+            # QUIT
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
-            # Keydown
+            # Key-down
             if event.type == KEYDOWN:
                 # PLACE PIECE BELOW WITH ( SPACE )
                 if event.key == pygame.K_SPACE:
                     while not current_tetromino.is_placed:
                         # Move piece down if it can move down, otherwise place it
-                        if current_tetromino.can_move_down(placed_tiles):
-                            current_tetromino.move_down(placed_tiles)
-                        else:
-                            current_tetromino.place_tetromino()
-
+                        current_tetromino.move_down(placed_tiles)
                 # TURN PIECE WITH ( UP_ARROW OR Z )
                 if (event.key == K_UP or event.key == ord('z')) and current_tetromino.type != 'O':
                     current_tetromino.rotate(placed_tiles)
@@ -270,10 +235,10 @@ def main():
                         using_held_piece = True
                         current_tetromino = held_tetromino
                         # Reset the position
-                        current_tetromino.tile_group = matrix_to_tiles(held_tetromino.binary_matrix,
-                                                                       held_tetromino.color)
+                        current_tetromino.tile_group = matrix_to_tiles(held_tetromino.binary_matrix, held_tetromino.color)
                         # Make the held tetromino slot empty again
                         held_tetromino = None
+                        # Generate the shadow tetromino
                 # DIRECTIONAL MOVEMENT
                 if event.key == K_DOWN:
                     current_tetromino.move_down(placed_tiles)
@@ -281,7 +246,6 @@ def main():
                     current_tetromino.move_right(placed_tiles)
                 if event.key == K_LEFT:
                     current_tetromino.move_left(placed_tiles)
-
         # Update tetrominos tiles to match their corresponding rects
         current_tetromino.update()
         # Remove full lines of tiles
@@ -296,68 +260,68 @@ def main():
             pygame.draw.rect(screen, placed_tile.color, placed_tile.rect)
         # Draw the current falling tetromino
         current_tetromino.draw(screen)
-        # Draw the  grid
-        draw_grid()
+        # Draw the shadow tetromino underneath the falling tetromino
+        # current_tetromino.shadow.draw(screen)
+
+        # Draw the grid
+        draw_grid([LEFT_BOUND, UPPER_BOUND], BORDER_DIMENSIONS[0], BORDER_DIMENSIONS[1])
+        # Create a border around the grid
+        border = pygame.Rect(LEFT_BOUND - 5, UPPER_BOUND - 5, TILE_SIZE * 10 + 10, TILE_SIZE * 15 + 10)
+        # Draw the border
+        pygame.draw.rect(screen, (0, 0, 0), border, 5)
         # Display the game
         pygame.display.update()
         # Pause the game to run at 60 FPS
         clock.tick(60)
 
 
+def get_five_random_tetrominos():
+    tetrominos = [get_next_tetromino() for _ in range(5)]
+    count = 0
+    for tetromino in tetrominos:
+        for tile in tetromino.tile_group:
+            tile.position[0] -= TILE_SIZE * int(WINDOW_SIZE[0] / (2 * TILE_SIZE)) - 4 * TILE_SIZE
+            tile.position[0] += count * TILE_SIZE * 5
+            tile.position[1] -= UPPER_BOUND + TILE_SIZE
+        count += 1
+    return tetrominos
+
+
 def load_screen():
     global score
-    score = 0
-    buttons = [
-        Button('Welcome to PyTetris!', x=180, y=70, font_size=50),
-        Button('START', 100, 250),
-        Button('OPTIONS', 100, 350),
-        Button('ABOUT', 100, 450)
-    ]
-    about = 0
-    tetromino = get_next_tetromino(randomize=True)
-    # LOOP
+    # Create the title buttons
+    welcome = Button('Welcome to PyTetris!', x=180, y=70, font_size=50)
+    start = Button('START', x=100, y=250)
+    options = Button('OPTIONS', x=100, y=350)
+    about = Button('ABOUT', x=100, y=450)
+    # Get the next tetromino
+    tetrominos = get_five_random_tetrominos()
     running = True
     while running:
-        screen.fill((0, 0, 0))
-        tetromino.update()
+        screen.fill(BLACK)
+        for tetromino in tetrominos:
+            tetromino.update()
         for event in pygame.event.get():
-            if event.type == KEYDOWN:
-                # DIRECTIONAL MOVEMENT
-                if event.key == K_DOWN:
-                    tetromino.move_down()
-                if event.key == K_RIGHT:
-                    tetromino.move_right()
-                if event.key == K_LEFT:
-                    tetromino.move_left()
-
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit(0)
             # START
-            if buttons[1].is_pressed():
+            if start.is_pressed():
                 main()
                 running = False
             # OPTIONS
-            if buttons[2].is_pressed():
-                buttons[2].update_text("There are none.")
-            # ABOUT CLICK
-            if buttons[3].is_pressed():
-                about += 1
-            if about >= 4:
-                buttons[3].update_text("Stop it")
-            if about >= 7:
-                buttons[3].update_text("> - <")
-            if about >= 10:
-                pygame.quit()
-                sys.exit(0)
-        # Display all the buttons
-        if tetromino.tile_group[0].position[1] > WINDOW_SIZE[1]:
-            tetromino = get_next_tetromino(randomize=True)
+            if options.is_pressed():
+                options.update_text("There are none.")
         # Move the tetromino down and draw it
-        tetromino.move_down(override=True)
-        tetromino.draw(screen)
-
-        for button in buttons:
+        for tetromino in tetrominos:
+            tetromino.move_down(check_bound=False)
+            tetromino.draw(screen)
+            if tetromino.tile_group[0].position[1] > WINDOW_SIZE[1]:
+                tetrominos = get_five_random_tetrominos()
+        # Draw the grid
+        draw_grid([0, 0], WINDOW_SIZE[0], WINDOW_SIZE[1])
+        # Display all the buttons
+        for button in [welcome, start, options, about]:
             button.blit(screen)
         # Update display
         pygame.display.flip()
@@ -366,4 +330,4 @@ def load_screen():
 
 
 if __name__ == '__main__':
-    load_screen()
+    main()

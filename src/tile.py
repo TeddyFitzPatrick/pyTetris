@@ -1,15 +1,5 @@
 import pygame
-
-WINDOW_SIZE = (850, 700)  # set the window size
-
-# The size of a tile
-TILE_SIZE = 32
-
-# GRID POSITIONING
-LEFT_BOUND = TILE_SIZE * 7  # Left Bound
-RIGHT_BOUND = LEFT_BOUND + 9 * TILE_SIZE  # Right Bound
-LOWER_BOUND = TILE_SIZE * 16  # Lower Bound
-UPPER_BOUND = TILE_SIZE * 2  # Upper Bound
+from constants import *
 
 
 class Tile:
@@ -25,7 +15,7 @@ class Tile:
         # Make the rect track the position of the rect surface
         self.rect.x, self.rect.y = self.position[0], self.position[1]
 
-    def move_down(self, placed_tiles, override=False):
+    def move_down(self, placed_tiles: list, check_bound=True):
         can_move_down = True
         # Check Lower Bound
         if self.position[1] + TILE_SIZE > LOWER_BOUND:
@@ -35,18 +25,20 @@ class Tile:
             # If a placed piece is on the same horizontal and below, the current can't move down.
             if self.position[1] + TILE_SIZE == placed_tile.position[1] and self.position[0] == placed_tile.position[0]:
                 can_move_down = False
-        if can_move_down or override:
+        if can_move_down or not check_bound:
+            # Move the tile down
             self.position[1] += TILE_SIZE
             self.update()
         else:
+            # Don't move the tile, and mark it as placed
             self.is_placed = True
 
-    def move_left(self):
-        if not (self.position[0] - TILE_SIZE < LEFT_BOUND):
+    def move_left(self, check_bound=True):
+        if not (self.position[0] - TILE_SIZE < LEFT_BOUND) or not check_bound:
             self.position[0] -= TILE_SIZE
             self.update()
 
-    def move_right(self):
-        if not (self.position[0] + TILE_SIZE > RIGHT_BOUND):
+    def move_right(self, check_bound=True):
+        if not (self.position[0] + TILE_SIZE > RIGHT_BOUND) or not check_bound:
             self.position[0] += TILE_SIZE
             self.update()
