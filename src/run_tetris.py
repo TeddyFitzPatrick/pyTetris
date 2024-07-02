@@ -1,16 +1,11 @@
-import math
 import random
-import time
 
-import pygame
 import sys
-import copy
 
 from pygame.locals import *
 
-from constants import *
 from tetromino import *
-from widgets.button import Button
+from button import Button
 
 clock = pygame.time.Clock()  # setup clock
 pygame.init()
