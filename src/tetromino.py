@@ -1,8 +1,4 @@
 import copy
-import time
-from typing import List
-
-import pygame
 
 from constants import *
 from tile import Tile

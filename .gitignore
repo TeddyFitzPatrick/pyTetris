@@ -1,10 +1,14 @@
-# Executables
-/dist
+# Executable Files
+/src/run_tetris.spec
+/src/build
+/src/dist
+.venv
 
 # Pygame build process: config.py setup.py
 /Setup
 *.pyc
 /build/
+/build/run_tetris
 /src_py/version.py
 
 # Windows prebuilt external libraries

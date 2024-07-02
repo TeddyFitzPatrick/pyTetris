@@ -5,8 +5,8 @@ pygame.font.init()
 WINDOW_SIZE = (850, 600)
 
 # Game Font
-MAIN_FONT = pygame.font.Font('font/Ubuntu-Medium.ttf', 24)
-TITLE_FONT = pygame.font.Font('font/Ubuntu-Medium.ttf', 48)
+MAIN_FONT = pygame.font.Font('src/font/Ubuntu-Medium.ttf', 24)
+TITLE_FONT = pygame.font.Font('src/font/Ubuntu-Medium.ttf', 48)
 # GRID CONSTS
 TILE_SIZE = 32  # The size of a tile
 GRID_WIDTH = 2
