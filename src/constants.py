@@ -1,14 +1,26 @@
+import pygame
+pygame.font.init()
+
 # Define the window dimensions
 WINDOW_SIZE = (850, 600)
 
-# GRID POSITIONING
+# Game Font
+MAIN_FONT = pygame.font.Font('font/Ubuntu-Medium.ttf', 24)
+TITLE_FONT = pygame.font.Font('font/Ubuntu-Medium.ttf', 48)
+# GRID CONSTS
 TILE_SIZE = 32  # The size of a tile
-LEFT_BOUND = TILE_SIZE * 7  # Left Bound
-RIGHT_BOUND = LEFT_BOUND + 9 * TILE_SIZE  # Right Bound
-LOWER_BOUND = TILE_SIZE * 16  # Lower Bound
-UPPER_BOUND = TILE_SIZE * 2  # Upper Bound
+GRID_WIDTH = 2
 
-# Box dimensions
+# Bounds
+LEFT_BOUND = TILE_SIZE * 7                  # Left Bound
+RIGHT_BOUND = TILE_SIZE * 16                # Right Bound
+LOWER_BOUND = TILE_SIZE * 16                # Lower Bound
+UPPER_BOUND = TILE_SIZE * 2                 # Upper Bound
+
+# Box positioning and dimensions
+UPCOMING_BLOCK_POSITION = (TILE_SIZE * 18, UPPER_BOUND)
+HELD_POSITION = (TILE_SIZE, UPPER_BOUND)
+
 BORDER_DIMENSIONS = (10 * TILE_SIZE, 15 * TILE_SIZE)
 UPCOMING_DIMENSIONS = (5 * TILE_SIZE, 12 * TILE_SIZE)
 HELD_DIMENSIONS = (5 * TILE_SIZE, 4 * TILE_SIZE)
@@ -24,6 +36,7 @@ DEFAULT_POSITIONS = [
     [(5, 4), (6, 4), (7, 4), (8, 4)],
     [(5, 5), (6, 5), (7, 5), (8, 5)]
 ]
+
 # Tetromino types and their corresponding binary position matrices
 tetrominos = {
     'I': [[0, 0, 0, 0],

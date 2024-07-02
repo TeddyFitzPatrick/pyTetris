@@ -1,3 +1,6 @@
+# Executables
+/dist
+
 # Pygame build process: config.py setup.py
 /Setup
 *.pyc

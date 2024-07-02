@@ -1,5 +1,6 @@
 import copy
 import time
+from typing import List
 
 import pygame
 
@@ -19,7 +20,7 @@ def matrix_to_tiles(binary_matrix, color):
     return tile_group
 
 
-def get_default_origin(tetromino_type: str) -> list[int, int]:
+def get_default_origin(tetromino_type: str) -> list[int]:
     # The square piece cannot rotate.
     if tetromino_type == 'O':
         return [0, 0]
@@ -59,7 +60,7 @@ class Tetromino:
         for tile in self.tile_group:
             tile.update()
 
-    def rotate(self, placed_tiles=[]) -> None:
+    def rotate(self, placed_tiles=()) -> None:
         # Create a list of new rotated positions for each tile
         rotated_positions = []
         for tile in self.tile_group:
@@ -68,10 +69,11 @@ class Tetromino:
             # Rotate the coordinates by translating (x, y) to (-y, x)
             rotated_positions.append([-origin_pos[1] + self.origin_cords[0], origin_pos[0] + self.origin_cords[1]])
         can_rotate = True
+
         # Check that the tetromino rotation does not go out of bounds or interfere with other tiles
         for new_position in rotated_positions:
             # Check that each tile is within bounds after rotation
-            if new_position[0] < LEFT_BOUND or new_position[0] > RIGHT_BOUND or new_position[1] > LOWER_BOUND:
+            if new_position[0] < LEFT_BOUND or new_position[0] > RIGHT_BOUND or new_position[1] < UPPER_BOUND or new_position[1] > LOWER_BOUND:
                 can_rotate = False
                 break
             # Check that each tile in the tetromino won't overlap with an existing tile
@@ -90,7 +92,7 @@ class Tetromino:
         for tile in self.tile_group:
             tile.is_placed = True
 
-    def can_move_down(self, placed_tiles=[]) -> bool:
+    def can_move_down(self, placed_tiles=()) -> bool:
         # Check for collisions with placed tiles
         for tile in self.tile_group:
             for placed_tile in placed_tiles:
@@ -104,7 +106,7 @@ class Tetromino:
                 return False
         return True
 
-    def move_down(self, placed_tiles=[], check_bound=True) -> None:
+    def move_down(self, placed_tiles=(), check_bound=True) -> None:
         # Move tetromino down if possible
         if self.can_move_down(placed_tiles) or not check_bound:
             self.origin_cords[1] += TILE_SIZE
@@ -113,7 +115,7 @@ class Tetromino:
         else:
             self.place_tetromino()
 
-    def move_left(self, placed_tiles=[], check_bound=True):
+    def move_left(self, placed_tiles=(), check_bound=True):
         can_move_left = True
         # Check for leftward placed tiles
         for tile in self.tile_group:
@@ -132,7 +134,7 @@ class Tetromino:
             for tile in self.tile_group:
                 tile.move_left(check_bound)
 
-    def move_right(self, placed_tiles=[], check_bound=True):
+    def move_right(self, placed_tiles=(), check_bound=True):
         can_move_right = True
         # Check for rightward placed tiles
         for tile in self.tile_group:

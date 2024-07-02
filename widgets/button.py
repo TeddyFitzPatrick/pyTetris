@@ -1,14 +1,8 @@
-import pygame
-import pygame.mouse
-
-pygame.init()
-
-WHITE = (255, 255, 255)
-
+from src.constants import *
 
 class Button:
     def __init__(self, text, x, y, font_size=36):
-        self.font = pygame.font.Font(pygame.font.get_default_font(), font_size)
+        self.font = pygame.font.Font('../src/font/Ubuntu-Medium.ttf', font_size)
 
         # Place the text field
         self.text = self.font.render(text, True, WHITE)
@@ -28,10 +22,7 @@ class Button:
         return self.rect.collidepoint(pygame.mouse.get_pos())
 
     def is_pressed(self):
-        pressed = self.hovering() and pygame.mouse.get_pressed()[0]
-        if pressed:
-            return True
-        return False
+        return self.hovering() and pygame.mouse.get_pressed()[0]
 
     def update_text(self, new_text):
         self.text = self.font.render(new_text, True, WHITE)
