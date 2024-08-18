@@ -9,6 +9,7 @@
 *.pyc
 /build/
 /build/run_tetris
+/src/build/
 /src_py/version.py
 
 # Windows prebuilt external libraries
